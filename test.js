@@ -158,6 +158,20 @@ ok('career sorted by PPR', cs.players[0].stats.ppr >= cs.players[cs.players.leng
 // 19 Skill bands
 ok('skill bands', E.skillLabel(4.9, 5) === 'Beginner' && E.skillLabel(5.5, 5) === 'Intermediate' && E.skillLabel(6.5, 5) === 'Intermediate+' && E.skillLabel(8, 5) === 'Advanced' && E.skillLabel(9.4, 5) === 'Pro level' && E.skillLabel(9, 0) === '');
 
+// 20 Bags off and Count every bag mode
+ok('bags off is four minus on and in', E.offBags({ w: 1, c: 1 }) === 2 && E.offBags({ w: 0, c: 4 }) === 0 && E.offBags({ w: 0, c: 0 }) === 4);
+var dr = { a: { w: 1, c: 1, o: 0 }, b: { w: 2, c: 0, o: 2 } };
+ok('normal mode scores without counting off bags', E.draftReady(dr, false) === true);
+ok('count every bag blocks an unfinished side', E.draftReady(dr, true) === false);
+dr.a.o = 2;
+ok('count every bag passes once all four are placed', E.draftReady(dr, true) === true);
+ok('count every bag rejects more than four', E.sideReady({ w: 2, c: 1, o: 2 }, true) === false);
+ok('countAll setting accepted or omitted', E.validSettings(S({ countAll: true })) && E.validSettings(S()) && !E.validSettings(S({ countAll: 'yes' })));
+pv = E.previewText([], { a: { w: 1, c: 0, o: 1 }, b: { w: 0, c: 1, o: 3 } }, S({ countAll: true }), [{ name: 'Blue' }, { name: 'Amber' }]);
+ok('preview names the side still to count', /Blue 2 of 4/.test(pv) && !/Amber/.test(pv), pv);
+pv = E.previewText([], { a: { w: 1, c: 1, o: 0 }, b: { w: 0, c: 0, o: 0 } }, S(), [{ name: 'Blue' }, { name: 'Amber' }]);
+ok('preview shows bags off', /Blue 4 \(2 off\)/.test(pv) && /Amber 0 \(4 off\)/.test(pv), pv);
+
 // Preview
 var teams = [{ name: 'Blue' }, { name: 'Amber' }];
 var pv = E.previewText(TO19, { a: { w: 2, c: 1 }, b: { w: 0, c: 0 } }, S({ bust: true }), teams);

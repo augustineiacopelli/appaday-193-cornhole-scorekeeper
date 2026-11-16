@@ -85,6 +85,11 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;-web
 .dots i.c::after{content:"";position:absolute;inset:4px;border-radius:50%;background:#05080e}
 .side.a .dots i.w,.side.a .dots i.c{background:var(--ca);border-color:var(--ca2)}
 .side.b .dots i.w,.side.b .dots i.c{background:var(--cb);border-color:var(--cb2)}
+.dots i.o{border-style:solid;border-color:#4a5873;background:repeating-linear-gradient(135deg,transparent 0 4px,#33415a 4px 6px)}
+.tally{text-align:center;font-size:.66rem;letter-spacing:.1em;color:var(--mut);font-variant-numeric:tabular-nums;min-height:1.2em}
+.tally b{color:var(--ink);font-weight:700}
+.tally em{font-style:normal;color:#ff9aa6;font-weight:700}
+.offstep .st-l{color:#b7c3d6}
 .step{display:flex;flex-direction:column;gap:4px}
 .st-l{font-size:.68rem;letter-spacing:.12em;color:var(--mut)}
 .st-c{display:flex;align-items:stretch;gap:6px}
@@ -312,6 +317,7 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;-web
     <div class="swatches" id="sw-b"></div>
     <h3>FORMAT</h3>
     <div class="seg" id="seg-mode"><button data-v="singles">Singles</button><button data-v="doubles">Doubles</button></div>
+    <button class="tog" id="tog-count" role="switch" aria-checked="false" style="margin-top:8px"><span>Count every bag<small>Adds an Off stepper. Score Frame waits until all four bags on each side are in, on or off.</small></span><span class="sw"></span></button>
     <h3>PLAY TO</h3>
     <div class="seg" id="seg-target"><button data-v="11">11</button><button data-v="15">15</button><button data-v="21">21</button><button data-v="25">25</button></div>
     <h3>BUST RULE</h3>
@@ -374,7 +380,25 @@ function validSettings(s) {
   if (SERIES_LENS.indexOf(s.seriesLen) < 0) return false;
   if (s.firstThrow !== 'a' && s.firstThrow !== 'b') return false;
   if (s.mode !== 'singles' && s.mode !== 'doubles') return false;
+  if (s.countAll !== undefined && typeof s.countAll !== 'boolean') return false;
   return typeof s.bust === 'boolean' && typeof s.loserThrowsFirst === 'boolean';
+}
+
+// Bags off the board: whatever of the four is neither on the board nor in the hole.
+function offBags(s) {
+  return 4 - s.w - s.c;
+}
+
+// A draft side is ready to score when its bags are valid; in Count every bag
+// mode the scorer must also tap in the off bags so all four are accounted for.
+function sideReady(s, strict) {
+  if (!validSide(s)) return false;
+  if (!strict) return true;
+  return isWhole(s.o) && s.w + s.c + s.o === 4;
+}
+
+function draftReady(draft, strict) {
+  return sideReady(draft.a, strict) && sideReady(draft.b, strict);
 }
 
 function round2(n) {
@@ -467,9 +491,18 @@ function previewText(frames, draft, settings, teams) {
   if (!validSide(draft.a) || !validSide(draft.b)) {
     return 'Each side throws four bags. Take a bag off before scoring.';
   }
+  var strict = settings.countAll === true;
+  if (!draftReady(draft, strict)) {
+    var miss = [];
+    ['a', 'b'].forEach(function (k) {
+      var n = draft[k].w + draft[k].c + (isWhole(draft[k].o) ? draft[k].o : 0);
+      if (n !== 4) miss.push(name(k) + ' ' + n + ' of 4');
+    });
+    return 'Count every bag: ' + miss.join(', ') + '. Tap in the bags off the board to finish the frame.';
+  }
   var after = compute(frames.concat([{ a: draft.a, b: draft.b, ts: 0 }]), settings);
   var row = after.rows[after.rows.length - 1];
-  var line = name('a') + ' ' + row.a + ', ' + name('b') + ' ' + row.b + '. ';
+  var line = name('a') + ' ' + row.a + ' (' + offBags(draft.a) + ' off), ' + name('b') + ' ' + row.b + ' (' + offBags(draft.b) + ' off). ';
   if (!row.scorer) {
     return line + 'Wash, no points. ' + name(before.nextFirst) + ' keeps the first throw.';
   }
@@ -625,11 +658,11 @@ function newId() {
 }
 
 function emptyDraft() {
-  return { a: { w: 0, c: 0 }, b: { w: 0, c: 0 } };
+  return { a: { w: 0, c: 0, o: 0 }, b: { w: 0, c: 0, o: 0 } };
 }
 
 function defaultSettings() {
-  return { target: 21, bust: false, bustTo: 13, mode: 'doubles', seriesLen: 1, firstThrow: 'a', loserThrowsFirst: true };
+  return { target: 21, bust: false, bustTo: 13, mode: 'doubles', seriesLen: 1, firstThrow: 'a', loserThrowsFirst: true, countAll: false };
 }
 
 var PALETTE = [
@@ -666,6 +699,11 @@ function defaultLive() {
   return { settings: defaultSettings(), teams: [{ name: 'Blue', color: DEFAULT_COLORS[0], players: ['', ''] }, { name: 'Amber', color: DEFAULT_COLORS[1], players: ['', ''] }], frames: [], series: { id: newId(), games: [] }, draft: emptyDraft() };
 }
 
+function draftSide(d) {
+  var off = isWhole(d.o) && d.w + d.c + d.o <= 4 ? d.o : 0;
+  return { w: d.w, c: d.c, o: off };
+}
+
 function cleanName(v, fb) {
   var s = typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, 16) : '';
   return s || fb;
@@ -683,6 +721,7 @@ function normalizeLive(o) {
     if (s.mode !== 'singles') s.mode = 'doubles';
     s.bust = s.bust === true;
     s.loserThrowsFirst = s.loserThrowsFirst !== false;
+    s.countAll = s.countAll === true;
   }
   var teams = Array.isArray(o.teams) ? o.teams : [];
   var frames = Array.isArray(o.frames) ? o.frames.filter(validFrame).map(function (f) {
@@ -698,7 +737,7 @@ function normalizeLive(o) {
     }),
     frames: frames,
     series: series ? { id: typeof series.id === 'string' ? series.id : newId(), games: series.games.filter(function (g) { return g && (g.winner === 'a' || g.winner === 'b'); }) } : { id: newId(), games: [] },
-    draft: o.draft && validSide(o.draft.a) && validSide(o.draft.b) ? { a: { w: o.draft.a.w, c: o.draft.a.c }, b: { w: o.draft.b.w, c: o.draft.b.c } } : emptyDraft()
+    draft: o.draft && validSide(o.draft.a) && validSide(o.draft.b) ? { a: draftSide(o.draft.a), b: draftSide(o.draft.b) } : emptyDraft()
   };
 }
 
@@ -782,7 +821,9 @@ function sideHtml(ctx, k) {
   }
   return '<div class="side ' + k + '"><div class="side-h"><span class="side-n" id="' + ctx + '-n-' + k + '"></span><span class="side-p" id="' + ctx + '-p-' + k + '">0</span></div>' +
     '<div class="dots" id="' + ctx + '-dots-' + k + '" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
-    stepper('w', 'WOODIES', '1 PT') + stepper('c', 'CORNHOLES', '3 PTS') + '</div>';
+    '<div class="tally" id="' + ctx + '-t-' + k + '"></div>' +
+    stepper('w', 'WOODIES', '1 PT') + stepper('c', 'CORNHOLES', '3 PTS') +
+    (ctx === 'draft' ? '<div class="offstep" id="' + ctx + '-os-' + k + '">' + stepper('o', 'OFF', '0 PTS') + '</div>' : '') + '</div>';
 }
 $('entry').innerHTML = sideHtml('draft', 'a') + sideHtml('draft', 'b');
 $('edit-entry').innerHTML = sideHtml('edit', 'a') + sideHtml('edit', 'b');
@@ -797,13 +838,22 @@ function fillSides(ctx, d) {
     $(ctx + '-' + k + '-c').textContent = s.c;
     $(ctx + '-p-' + k).textContent = sidePoints(s) + (sidePoints(s) === 1 ? ' PT' : ' PTS');
     $(ctx + '-n-' + k).textContent = tname(k).toUpperCase();
+    var strict = ctx === 'draft' && live.settings.countAll === true;
+    var off = strict ? (s.o || 0) : offBags(s);
+    var open = 4 - s.c - s.w - off;
     var dots = $(ctx + '-dots-' + k).children;
-    for (var i = 0; i < 4; i++) dots[i].className = i < s.c ? 'c' : (i < s.c + s.w ? 'w' : '');
-    var full = s.w + s.c >= 4;
+    for (var i = 0; i < 4; i++) dots[i].className = i < s.c ? 'c' : (i < s.c + s.w ? 'w' : (i < s.c + s.w + off ? 'o' : ''));
+    var tl = $(ctx + '-t-' + k);
+    tl.innerHTML = s.c + ' IN' + DOT + s.w + ' ON' + DOT + '<b>' + off + ' OFF</b>' + (strict && open > 0 ? DOT + '<em>' + open + ' TO COUNT</em>' : '');
+    tl.className = 'tally' + (strict && open > 0 ? ' open' : '');
+    if (strict) $(ctx + '-' + k + '-o').textContent = s.o || 0;
+    var os = $(ctx + '-os-' + k);
+    if (os) os.hidden = !strict;
+    var full = s.w + s.c + (strict ? (s.o || 0) : 0) >= 4;
     var root = $(ctx + '-' + k + '-w').closest('.side');
     Array.prototype.forEach.call(root.querySelectorAll('button[data-d]'), function (b) {
       var kind = b.getAttribute('data-k'), dd = +b.getAttribute('data-d');
-      b.disabled = dd < 0 ? s[kind] <= 0 : full;
+      b.disabled = dd < 0 ? (s[kind] || 0) <= 0 : full;
     });
   });
 }
@@ -820,9 +870,10 @@ function onStep(e) {
   if (!b || b.disabled) return;
   var ctx = b.getAttribute('data-ctx'), k = b.getAttribute('data-side'), kind = b.getAttribute('data-k'), d = +b.getAttribute('data-d');
   var target = ctx === 'draft' ? live.draft : editDraft;
-  var s = { w: target[k].w, c: target[k].c };
+  var s = { w: target[k].w, c: target[k].c, o: target[k].o || 0 };
   s[kind] += d;
-  if (!validSide(s)) return;
+  if (!validSide(s) || !isWhole(s.o) || s.w + s.c + s.o > 4) return;
+  if (ctx !== 'draft') delete s.o;
   target[k] = s;
   if (ctx === 'draft') {
     if (kind === 'c' && d > 0 && s.c === 4) flashFour(k);
@@ -883,7 +934,7 @@ function render() {
   fillSides('draft', live.draft);
   var pv = $('preview');
   pv.textContent = previewText(live.frames, live.draft, st, live.teams);
-  var draftOk = validSide(live.draft.a) && validSide(live.draft.b);
+  var draftOk = draftReady(live.draft, st.countAll === true);
   pv.className = 'preview' + (c.winner ? ' win' : (draftOk ? '' : ' bad'));
   $('btn-score').disabled = !!c.winner || !draftOk;
   $('btn-undo').disabled = live.frames.length === 0;
@@ -925,7 +976,7 @@ function renderLog(c) {
 function scoreFrame() {
   var st = live.settings;
   if (compute(live.frames, st).winner) return;
-  if (!validSide(live.draft.a) || !validSide(live.draft.b)) return;
+  if (!draftReady(live.draft, st.countAll === true)) return;
   live.frames.push({ a: { w: live.draft.a.w, c: live.draft.a.c }, b: { w: live.draft.b.w, c: live.draft.b.c }, ts: Date.now() });
   live.draft = emptyDraft();
   persist();
@@ -939,7 +990,7 @@ function scoreFrame() {
 function undo() {
   if (!live.frames.length) return;
   var f = live.frames.pop();
-  live.draft = { a: { w: f.a.w, c: f.a.c }, b: { w: f.b.w, c: f.b.c } };
+  live.draft = { a: { w: f.a.w, c: f.a.c, o: offBags(f.a) }, b: { w: f.b.w, c: f.b.c, o: offBags(f.b) } };
   persist();
   render();
   toast('Frame ' + (live.frames.length + 1) + ' undone and back in the entry');
@@ -1222,6 +1273,7 @@ function syncGear() {
   $('first-b').textContent = tname('b');
   $('tog-bust').setAttribute('aria-checked', st.bust ? 'true' : 'false');
   $('tog-loser').setAttribute('aria-checked', st.loserThrowsFirst ? 'true' : 'false');
+  $('tog-count').setAttribute('aria-checked', st.countAll ? 'true' : 'false');
   $('bust-val').textContent = st.bustTo;
   $('bust-step').hidden = !st.bust;
   $('bust-dn').disabled = st.bustTo <= 0;
@@ -1316,6 +1368,7 @@ segHandler('seg-series', function (v) { applySettings({ seriesLen: +v }); });
 segHandler('seg-first', function (v) { applySettings({ firstThrow: v }); });
 $('tog-bust').addEventListener('click', function () { applySettings({ bust: !live.settings.bust }); });
 $('tog-loser').addEventListener('click', function () { applySettings({ loserThrowsFirst: !live.settings.loserThrowsFirst }); });
+$('tog-count').addEventListener('click', function () { applySettings({ countAll: !live.settings.countAll }); });
 $('bust-dn').addEventListener('click', function () { applySettings({ bustTo: Math.max(0, live.settings.bustTo - 1) }); });
 $('bust-up').addEventListener('click', function () { applySettings({ bustTo: Math.min(live.settings.target - 1, live.settings.bustTo + 1) }); });
 twoTap($('btn-reset'), 'Tap again to reset', function () {

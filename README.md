@@ -8,7 +8,7 @@ Part of [AppADay](https://augustineiacopelli.github.io/appaday/), one complete a
 
 ## How to use it
 
-After each frame, count what each side left on the board and in the hole. Use the Woodies stepper for bags on the board (1 point each) and the Cornholes stepper for bags through the hole (3 points each). Four dots per side mirror the four bags thrown, and a side cannot go past four. The preview line under the steppers shows what will happen before anything is committed: who nets how many, the new score, whether it busts, or whether it wins. Tap Score Frame to commit it. Undo sits beside it and puts the last frame back into the steppers so it can be corrected.
+After each frame, count what each side left on the board and in the hole. Use the Woodies stepper for bags on the board (1 point each) and the Cornholes stepper for bags through the hole (3 points each). Four dots per side mirror the four bags thrown: a filled dot with a hole for each cornhole, a filled dot for each woodie, and a hatched dot for each bag off the board. A tally under the dots reads, for example, 1 IN, 1 ON, 2 OFF, so you can check the board against the grass before committing, and a side cannot go past four. The preview line under the steppers shows what will happen before anything is committed: each side's points and bags off, who nets how many, the new score, whether it busts, or whether it wins. Tap Score Frame to commit it. Undo sits beside it and puts the last frame back into the steppers so it can be corrected.
 
 Scoring is cancellation scoring. Only the difference between the two sides counts, so 3 cornholes and a woodie (10) against 2 cornholes and 2 woodies (8) nets 2 for the first side. A wash scores nothing. The side that scored last frame throws first in the next one, and the first throw stays put on a wash. The THROWS FIRST badge on the scoreboard shows who has it. Four cornholes from one side flashes FOUR BAGGER on that team's panel.
 
@@ -17,6 +17,10 @@ By default the first side to reach the target or more wins, as under official ru
 Tap any frame in the log to edit it with the same steppers, then Save, or Delete with two taps. Every total after it is recomputed. If an edit makes the game end earlier, frames after the winning frame are struck through and a Trim button removes them. Undo after a win reopens the game.
 
 When a team wins, the win card shows the final score and the full American Cornhole League stat line for each side, counted over the frames up to the win: PPR (points per round, raw points before cancellation), DPR (differential per round, PPR minus the opponent's PPR), bags in, on and off percentages, four baggers with their percentage, and rounds won, tied and lost. Bags off is simply the four bags thrown minus the woodies and cornholes, so none of this asks for any extra input. Next Game saves the game to history and starts the next one. In a best of 3 or 5 series the button reads Series Complete when the series is decided, and pips under each team name track games won. With Loser throws first turned on, the losing side opens the next game.
+
+## Count every bag
+
+By default bags off are worked out as four minus the woodies and cornholes, so a frame takes as few taps as possible. Turn on Count every bag in the gear menu for league nights or any game where the stats matter: each side gets a third Off stepper, the tally flags how many bags are still to count, and Score Frame stays disabled until all four bags on both sides are in, on or off. That catches a missed woodie before it quietly becomes a bag off. Undo puts a frame back with its off bags filled in.
 
 ## Stats
 
@@ -28,7 +32,7 @@ The Career tab in Match History combines every saved game by name, ignoring case
 
 ## Customizing
 
-Tap a team name on the scoreboard to rename it. Each team also gets its own color: pick one of nine presets in the gear menu, or set any custom color, and the scoreboard numerals, panel stripe, bag dots, frame log, win card and history all follow it. A color already used by the other team is greyed out, and a team still named after its preset color (Blue, Amber and so on) is renamed to match when you pick a new preset. Very dark custom colors are lifted on the numerals so the score stays readable from across the yard. The gear menu holds team names and colors, doubles player names, singles or doubles, the target, the bust toggle and bust value, series length, who throws first, the loser throws first toggle, Reset Game, and JSON export and import. The clock button opens Match History, grouped by series, which clears with two taps.
+Tap a team name on the scoreboard to rename it. Each team also gets its own color: pick one of nine presets in the gear menu, or set any custom color, and the scoreboard numerals, panel stripe, bag dots, frame log, win card and history all follow it. A color already used by the other team is greyed out, and a team still named after its preset color (Blue, Amber and so on) is renamed to match when you pick a new preset. Very dark custom colors are lifted on the numerals so the score stays readable from across the yard. The gear menu holds team names and colors, doubles player names, singles or doubles, Count every bag, the target, the bust toggle and bust value, series length, who throws first, the loser throws first toggle, Reset Game, and JSON export and import. The clock button opens Match History, grouped by series, which clears with two taps.
 
 The screen stays awake during play where the browser supports the Wake Lock API, and a small dot next to the subtitle shows while the lock is held.
 
@@ -38,11 +42,11 @@ Everything stays in this browser's localStorage. `appaday-193-live` holds the se
 
 ## Build
 
-One `index.html` with inline CSS and JavaScript, no frameworks, no build step, Chakra Petch from Google Fonts. The scoring engine sits between `/* ENGINE START */` and `/* ENGINE END */` and touches no DOM: `validSide`, `sidePoints`, `frameNet`, `validSettings`, `compute`, `trimFrames`, `undoFrames`, `seriesStatus`, `previewText`, and the stats functions `sideStats`, `playerStats`, `careerStats` and `skillLabel`. The layout fills the screen at 375px wide in portrait and splits into a scoreboard column and a controls column in landscape.
+One `index.html` with inline CSS and JavaScript, no frameworks, no build step, Chakra Petch from Google Fonts. The scoring engine sits between `/* ENGINE START */` and `/* ENGINE END */` and touches no DOM: `validSide`, `sidePoints`, `frameNet`, `validSettings`, `compute`, `trimFrames`, `undoFrames`, `seriesStatus`, `previewText`, and the stats functions `sideStats`, `playerStats`, `careerStats` and `skillLabel`, plus `offBags`, `sideReady` and `draftReady` for bag counting. The layout fills the screen at 375px wide in portrait and splits into a scoreboard column and a controls column in landscape.
 
 ## Tests
 
-`test.js` loads the engine straight out of `index.html` and runs 45 checks covering cancellation, washes and first throw, four baggers, exact and over target wins, bust before and after cancellation, settings validation, bag limits, frame edits, undo after a win, frames after a win, points per frame, best of 3 and 5 series, the full stat line, the doubles odd and even frame split, career merging by name, and the skill bands.
+`test.js` loads the engine straight out of `index.html` and runs 53 checks covering cancellation, washes and first throw, four baggers, exact and over target wins, bust before and after cancellation, settings validation, bag limits, frame edits, undo after a win, frames after a win, points per frame, best of 3 and 5 series, the full stat line, the doubles odd and even frame split, career merging by name, the skill bands, and bags off with Count every bag mode.
 
 ```
 bash tests/run.sh
